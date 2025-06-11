@@ -4,14 +4,18 @@ FILE="data.csv"
 COL=2  # column index (1-based) you want to bucket
 
 # Extract the column and compute min and max
+
 read MIN MAX <<< $(awk -F, -v col=$COL '
-    NR == 1 { min = max = $col; next }
+    NR == 1 { next }  # Skip header
+    NR == 2 { min = max = $col; next }
     {
         if ($col < min) min = $col;
         if ($col > max) max = $col;
     }
     END { print min, max }
 ' "$FILE")
+
+
 
 # Compute bucket width
 WIDTH=$(awk -v min="$MIN" -v max="$MAX" 'BEGIN {print (max - min)/15}')
@@ -25,6 +29,8 @@ BEGIN {
         upper[i] = lower[i] + width;
     }
 }
+
+
 {
     val = $col;
     b = int((val - min) / width);
