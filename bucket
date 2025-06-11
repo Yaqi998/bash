@@ -4,28 +4,36 @@ FILE="data.csv"
 COL=2  # column index (1-based) you want to bucket
 
 # Extract the column and compute min and max
-read MIN MAX <<< $(awk -F, -v col=$COL 'NR==1 {min=max=$col} 
-    NR>1 {
-        if ($col < min) min=$col;
-        if ($col > max) max=$col
-    } END {print min, max}' "$FILE")
+read MIN MAX <<< $(awk -F, -v col=$COL '
+    NR == 1 { min = max = $col; next }
+    {
+        if ($col < min) min = $col;
+        if ($col > max) max = $col;
+    }
+    END { print min, max }
+' "$FILE")
 
 # Compute bucket width
 WIDTH=$(awk -v min="$MIN" -v max="$MAX" 'BEGIN {print (max - min)/15}')
 
-# Bucket and output results: count of rows per bucket
-awk -F, -v col=$COL -v min="$MIN" -v width="$WIDTH" '
+# Bucket and output results with boundaries
+awk -F, -v col=$COL -v min="$MIN" -v max="$MAX" -v width="$WIDTH" '
 BEGIN {
-    for (i = 0; i < 15; i++) counts[i] = 0;
+    for (i = 0; i < 15; i++) {
+        counts[i] = 0;
+        lower[i] = min + i * width;
+        upper[i] = lower[i] + width;
+    }
 }
 {
     val = $col;
     b = int((val - min) / width);
-    if (b >= 15) b = 14;  # ensure max falls into the last bucket
+    if (b >= 15) b = 14;  # make sure max goes into the last bucket
     counts[b]++;
 }
 END {
+    printf "%-10s %-20s %-10s\n", "Bucket", "Range", "Count";
     for (i = 0; i < 15; i++) {
-        printf "Bucket %2d: %d\n", i, counts[i];
+        printf "%-10d [%.4f, %.4f) %-10d\n", i, lower[i], (i==14 ? max : upper[i]), counts[i];
     }
 }' "$FILE"
